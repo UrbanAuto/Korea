@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Калькулятор авто Корея -> Україна</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f6f7fb; margin:0; padding:20px; }
+    .wrap { max-width: 760px; margin:0 auto; background:#fff; padding:20px; border-radius:12px; }
+    h1 { margin-top:0; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    label { font-size:14px; color:#444; display:block; margin-bottom:4px; }
+    input, select, button { width:100%; padding:10px; font-size:14px; }
+    .wide { grid-column:1 / -1; }
+    .result { margin-top:20px; padding:14px; background:#f0f5ff; border-radius:10px; }
+    .line { display:flex; justify-content:space-between; margin:6px 0; }
+    .total { font-weight:700; font-size:20px; margin-top:10px; }
+    .warn { margin-top:12px; color:#a33; font-size:13px; }
+    @media (max-width: 700px) { .grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Калькулятор авто: Корея -> Україна</h1>
+
+    <div class="grid">
+      <div>
+        <label>Вартість авто (USD)</label>
+        <input id="carPrice" type="number" value="10000" min="1" />
+      </div>
+      <div>
+        <label>Рік випуску</label>
+        <input id="year" type="number" min="1900" />
+      </div>
+      <div>
+        <label>Тип двигуна</label>
+        <select id="engineType">
+          <option>Бензин</option>
+          <option>Дизель</option>
+          <option>Гібрид</option>
+          <option>Електро</option>
+        </select>
+      </div>
+      <div>
+        <label>Об'єм двигуна (см³)</label>
+        <input id="engineCc" type="number" value="2000" min="1" />
+      </div>
+      <div>
+        <label>Потужність (kW, для електро)</label>
+        <input id="powerKw" type="number" placeholder="тільки для електро" disabled />
+      </div>
+      <div>
+        <label>Курс EUR/USD</label>
+        <input id="eurUsd" type="number" value="1.16" step="0.0001" min="0.0001" />
+      </div>
+      <div>
+        <label>фафа(USD)</label>
+        <input id="profit" type="number" value="0" min="0" />
+      </div>
+      <div class="wide">
+        <button id="calcBtn">Розрахувати</button>
+      </div>
+    </div>
+
+    <div class="result" id="result">
+      Заповніть поля і натисніть "Розрахувати".
+    </div>
+    <div class="warn">Розрахунок орієнтовний, точна вартість залежить від митного брокера та курсу валют.</div>
+  </div>
+
+  <script>
+    const DELIVERY = 6550;
+    const DUTY_RATE = 0.10;
+    const VAT_RATE = 0.20;
+
+    const yearInput = document.getElementById('year');
+    yearInput.value = String(new Date().getFullYear() - 5);
+
+    const engineType = document.getElementById('engineType');
+    const engineCc = document.getElementById('engineCc');
+    const powerKw = document.getElementById('powerKw');
+
+    engineType.addEventListener('change', () => {
+      const isElectric = engineType.value === 'Електро';
+      powerKw.disabled = !isElectric;
+      engineCc.disabled = isElectric;
+      if (isElectric) {
+        engineCc.value = '0';
+      } else {
+        powerKw.value = '';
+      }
+    });
+
+    function usd(v) {
+      return '$' + Math.round(v).toLocaleString('uk-UA');
+    }
+
+    document.getElementById('calcBtn').addEventListener('click', () => {
+      try {
+        const carPrice = Number(document.getElementById('carPrice').value);
+        const year = Number(document.getElementById('year').value);
+        const eurUsd = Number(document.getElementById('eurUsd').value);
+        const profit = Number(document.getElementById('profit').value || 0);
+
+        if (!(carPrice > 0 && eurUsd > 0 && year > 1900)) {
+          throw new Error('Перевірте введені значення.');
+        }
+
+        const age = Math.max(1, new Date().getFullYear() - year);
+        const customsValue = carPrice + DELIVERY;
+        const duty = customsValue * DUTY_RATE;
+
+        let exciseEur = 0;
+        if (engineType.value === 'Електро') {
+          const kw = Number(powerKw.value);
+          if (!(kw > 0)) throw new Error('Для електро вкажіть потужність (kW).');
+          exciseEur = kw;
+        } else {
+          const cc = Number(engineCc.value);
+          if (!(cc > 0)) throw new Error("Для ДВЗ вкажіть об'єм двигуна.");
+          const rate = engineType.value === 'Дизель' ? 75 : 50; // Гібрид як бензин
+          exciseEur = rate * (cc / 1000) * age;
+        }
+
+        const exciseUsd = exciseEur * eurUsd;
+        const vat = (customsValue + duty + exciseUsd) * VAT_RATE;
+        const customsTotal = duty + exciseUsd + vat;
+        const total = carPrice + DELIVERY + customsTotal + profit;
+
+        document.getElementById('result').innerHTML = `
+          <div class="line"><span>Ціна авто</span><span>${usd(carPrice)}</span></div>
+          <div class="line"><span>Комплекс доставки до Києва</span><span>${usd(DELIVERY)}</span></div>
+          <div class="line"><span>Мито (10%)</span><span>${usd(duty)}</span></div>
+          <div class="line"><span>Акциз</span><span>EUR ${exciseEur.toFixed(2)} (~ ${usd(exciseUsd)})</span></div>
+          <div class="line"><span>ПДВ (20%)</span><span>${usd(vat)}</span></div>
+          <div class="line"><span>Розмитнення разом</span><span>${usd(customsTotal)}</span></div>
+          <div class="line"><span>фафа</span><span>${usd(profit)}</span></div>
+          <div class="line"><span>Вік авто</span><span>${age} р.</span></div>
+          <div class="total line"><span>ЗАГАЛОМ ПІД КЛЮЧ</span><span>${usd(total)}</span></div>
+        `;
+      } catch (e) {
+        alert(e.message || 'Помилка розрахунку');
+      }
+    });
+  </script>
+</body>
+</html>
